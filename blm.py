@@ -25,7 +25,7 @@ class BartlettLewisModel:
 
     def identify_events(self, rainfall_series, inter_event_gap_minutes=30):
         events = []
-        interval_minutes = (rainfall_series.index[1] - rainfall_series.index[0]).seconds / 60
+        interval_minutes = (rainfall_series.index[1] - rainfall_series.index[0]).total_seconds() / 60
         gap_intervals = int(inter_event_gap_minutes / interval_minutes)
         padded_series = pd.concat([
             pd.Series([0] * gap_intervals, index=pd.date_range(start=rainfall_series.index[0] - pd.Timedelta(minutes=gap_intervals * interval_minutes),
@@ -118,7 +118,7 @@ class BartlettLewisModel:
             fine_times = pd.date_range(start=ts, periods=int(coarse_interval_minutes / fine_interval_minutes), freq=f'{fine_interval_minutes}min')
 
             if value == 0:
-                disagg = pd.concat([disagg, pd.Series(0.0, index=fine_times)])
+                new_segment = pd.Series(0.0, index=fine_times)
             else:
                 sim = self.generate_synthetic_rainfall(int(coarse_interval_minutes), output_interval_minutes=fine_interval_minutes, seed=seed)
                 if sim.sum() > 0:
@@ -126,7 +126,12 @@ class BartlettLewisModel:
                 else:
                     sim[:] = value / len(sim)
                 sim.index = fine_times
-                disagg = pd.concat([disagg, sim])
+                new_segment = sim
+
+            if disagg.empty:
+                disagg = new_segment
+            else:
+                disagg = pd.concat([disagg, new_segment])
 
         return disagg
 
@@ -155,10 +160,6 @@ class BartlettLewisModel:
         plt.tight_layout()
         plt.savefig('comparacao_chuva.png')
         plt.show()
-        
-    import pandas as pd
-    import numpy as np
-    import matplotlib.pyplot as plt
 
     def plot_comparison_barras(self, original, desagregada, title='Comparação - Barras'):
         """
