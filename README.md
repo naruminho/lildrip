@@ -37,8 +37,40 @@ Observations:
 
 Example of Calibrated Parameters:
 ---------------------------------
-lambda: 17.5        # ~17 rain events per day  
-beta: 5.0           # ~5 pulses per event  
-gamma: 0.05         # ~20 minutes duration per event  
-eta: 0.1            # ~10 minutes per pulse  
+lambda: 17.5        # ~17 rain events per day
+beta: 5.0           # ~5 pulses per event
+gamma: 0.05         # ~20 minutes duration per event
+eta: 0.1            # ~10 minutes per pulse
 mu: 0.12            # ~0.12 mm per rain pulse
+
+## Gerando dados de chuva de exemplo
+
+Antes de rodar os exemplos, instale as dependências do projeto:
+
+```bash
+pip install -r requirements.txt
+```
+
+Para criar séries de chuva fina e grossa sintéticas, execute o script:
+
+```bash
+python examples/generate_demo_rain.py
+```
+
+Ele gera dois arquivos:
+
+- `chuva_fina_exemplo.csv` – chuva simulada a cada 10 minutos.
+- `chuva_grossa_exemplo.csv` – mesma chuva agregada para intervalos de 1 hora.
+
+## Executando o demo
+
+Com os arquivos acima disponíveis, execute o demo que calibra o modelo, gera
+chuva sintética e desagrega a série grossa:
+
+```bash
+python examples/bartlett_lewis_demo.py
+```
+
+O script salva os resultados em arquivos CSV (chuva sintética, parâmetros
+calibrados e chuva desagregada) e exibe um gráfico comparando os valores
+originais e desagregados.
