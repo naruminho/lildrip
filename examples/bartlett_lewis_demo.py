@@ -1,5 +1,5 @@
 import pandas as pd
-from blm import BartlettLewisModel
+from lildrip import BartlettLewisModel, plot_comparison_bars
 
 
 def load_dataframe(filepath, index_col='timestamp'):
@@ -64,7 +64,7 @@ def main():
     start, end = disaggregated_rain.index.min(), disaggregated_rain.index.max()
     original_subset = df_fine_proc['rainfall_mm'].loc[start:end]
 
-    bl_model.plot_comparison_barras(
+    plot_comparison_bars(
         original_subset,
         disaggregated_rain,
         title="Original vs Disaggregated"
