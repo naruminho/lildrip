@@ -1,5 +1,5 @@
 import pandas as pd
-from bartlett_lewis_model import BartlettLewisModel  # Supondo que a classe foi salva nesse arquivo
+from blm import BartlettLewisModel  # Supondo que a classe foi salva nesse arquivo
 
 # ========== 1. Carregar série de chuva fina ==========
 df_fina = pd.read_csv('chuva_fina_exemplo.csv', parse_dates=['timestamp'])
