@@ -1,45 +1,44 @@
-Modelo Bartlett-Lewis para Desagregação Estocástica de Chuvas
+# Bartlett-Lewis Model for Stochastic Rainfall Disaggregation
 --------------------------------------------------------------
 
-Este modelo implementa a lógica estocástica do processo Bartlett-Lewis para simular a estrutura temporal da precipitação
-e realizar a desagregação de séries de chuva com resolução temporal mais grossa (como diária ou horária) para séries mais finas (como 10 min).
+This model implements the stochastic logic of the Bartlett-Lewis process to simulate the temporal structure of precipitation and perform the disaggregation of coarse temporal resolution rainfall series (such as daily or hourly) into finer series (such as 10 minutes).
 
-Parâmetros do Modelo (calibrados com base em uma série de chuva de alta resolução):
-- lambda (λ): frequência média de ocorrência de tempestades (eventos de chuva) por dia.
-- beta (β): número médio de pulsos (pequenos eventos de chuva) por tempestade.
-- gamma (γ): taxa de término da tempestade (inverso da duração média do evento de chuva).
-- eta (η): taxa de término de um pulso (inverso da duração média do pulso de chuva).
-- mu (μ): intensidade média da chuva por pulso (mm).
+Model Parameters (calibrated based on a high-resolution rainfall series):
+- lambda (λ): average frequency of storm occurrences (rain events) per day.
+- beta (β): average number of pulses (small rain events) per storm.
+- gamma (γ): termination rate of the storm (inverse of the average duration of the rain event).
+- eta (η): termination rate of a pulse (inverse of the average duration of the rain pulse).
+- mu (μ): average rainfall intensity per pulse (mm).
 
-Fluxo de uso:
+Usage Flow:
 -------------
-1. **Calibração do Modelo**
-    - Carregar série de chuva fina com resolução fixa (ex: 10 minutos).
-    - Identificar eventos de chuva com base em um tempo seco mínimo entre eles (inter_event_gap).
-    - Calibrar os parâmetros do modelo com base nas estatísticas desses eventos.
+1. **Model Calibration**
+    - Load the fine resolution rainfall series with a fixed interval (e.g., 10 minutes).
+    - Identify rain events based on a minimum dry period between them (inter_event_gap).
+    - Calibrate the model parameters based on the statistics of these events.
 
-2. **Desagregação**
-    - Carregar série de chuva grossa (ex: horária).
-    - Para cada valor observado na série grossa:
-        - Simular um evento de chuva com base nos parâmetros calibrados.
-        - Ajustar a intensidade da chuva simulada para igualar o volume observado.
-        - Dividir a chuva simulada nos intervalos mais finos desejados.
+2. **Disaggregation**
+    - Load the coarse resolution rainfall series (e.g., hourly).
+    - For each observed value in the coarse series:
+        - Simulate a rain event based on the calibrated parameters.
+        - Adjust the simulated rainfall intensity to match the observed volume.
+        - Divide the simulated rainfall into the desired finer intervals.
 
-3. **Exportação e Validação**
-    - Exportar os parâmetros calibrados em formato YAML para reuso.
-    - Comparar visualmente e estatisticamente as séries desagregadas com dados reais (quando disponíveis).
+3. **Export and Validation**
+    - Export the calibrated parameters in YAML format for reuse.
+    - Compare the disaggregated series with real data visually and statistically (when available).
 
-Observações:
+Observations:
 ------------
-- A calibração dos parâmetros usa o Método dos Momentos (MoM), que é mais simples que o MLE, porém mais direto.
-- A desagregação é estocástica: cada execução pode gerar uma distribuição diferente para o mesmo valor de entrada.
-- É recomendável usar uma semente aleatória (seed) para garantir reprodutibilidade dos resultados.
-- O modelo é adequado para aplicações hidrológicas onde a distribuição temporal da chuva afeta escoamento, infiltração, entre outros processos.
+- The parameter calibration uses the Method of Moments (MoM), which is simpler than MLE but more straightforward.
+- The disaggregation is stochastic: each execution may generate a different distribution for the same input value.
+- It is recommended to use a random seed to ensure reproducibility of the results.
+- The model is suitable for hydrological applications where the temporal distribution of rainfall affects runoff, infiltration, among other processes.
 
-Exemplo de Parâmetros Calibrados:
+Example of Calibrated Parameters:
 ---------------------------------
-lambda: 17.5        # ~17 eventos de chuva por dia
-beta: 5.0           # ~5 pulsos por evento
-gamma: 0.05         # ~20 minutos de duração por evento
-eta: 0.1            # ~10 minutos por pulso
-mu: 0.12            # ~0.12 mm por pulso de chuva
+lambda: 17.5        # ~17 rain events per day  
+beta: 5.0           # ~5 pulses per event  
+gamma: 0.05         # ~20 minutes duration per event  
+eta: 0.1            # ~10 minutes per pulse  
+mu: 0.12            # ~0.12 mm per rain pulse
