@@ -1,27 +1,27 @@
 import pandas as pd
 import numpy as np
 
-# Parâmetros da simulação
-intervalo_fino_min = 10
-intervalo_grosso_min = 60
-duracao_total_min = 1440  # 1 dia
-n_fino = duracao_total_min // intervalo_fino_min
-n_grosso = duracao_total_min // intervalo_grosso_min
+# Simulation parameters
+fine_interval_min = 10
+coarse_interval_min = 60
+total_duration_min = 1440  # 1 day
+n_fine = total_duration_min // fine_interval_min
+n_coarse = total_duration_min // coarse_interval_min
 
-# Gerar timestamps
-timestamps_finos = pd.date_range(start="2023-01-01 00:00", periods=n_fino, freq=f"{intervalo_fino_min}min")
+# Generate fine timestamps
+timestamps_fine = pd.date_range(start="2023-01-01 00:00", periods=n_fine, freq=f"{fine_interval_min}min")
 
-# Gerar chuva fina com zeros e alguns pulsos
+# Generate fine rainfall with zeros and some pulses
 np.random.seed(42)
-chuva_fina = np.random.poisson(0.3, size=n_fino).astype(float)
-chuva_fina[chuva_fina < 1] = 0
+rain_fine = np.random.poisson(0.3, size=n_fine).astype(float)
+rain_fine[rain_fine < 1] = 0
 
-# Criar DataFrame da chuva fina
-df_fina = pd.DataFrame({'timestamp': timestamps_finos, 'chuva_mm': chuva_fina})
-df_fina.to_csv('chuva_fina_exemplo.csv', index=False)
+# Create DataFrame for fine rainfall
+df_fine = pd.DataFrame({'timestamp': timestamps_fine, 'chuva_mm': rain_fine})
+df_fine.to_csv('chuva_fina_exemplo.csv', index=False)
 
-# Agregar para gerar a chuva grossa
-df_fina.set_index('timestamp', inplace=True)
-df_grossa = df_fina.resample(f"{intervalo_grosso_min}min").sum().reset_index()
-df_grossa = df_grossa.rename(columns={'chuva_mm': 'chuva_mm_grossa'})
-df_grossa.to_csv('chuva_grossa_exemplo.csv', index=False)
+# Aggregate to generate coarse rainfall
+df_fine.set_index('timestamp', inplace=True)
+df_coarse = df_fine.resample(f"{coarse_interval_min}min").sum().reset_index()
+df_coarse = df_coarse.rename(columns={'chuva_mm': 'chuva_mm_grossa'})
+df_coarse.to_csv('chuva_grossa_exemplo.csv', index=False)

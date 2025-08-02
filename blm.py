@@ -6,10 +6,26 @@ import yaml
 
 class BartlettLewisModel:
     def __init__(self, params=None):
+        """
+        Initialize the Bartlett-Lewis model.
+        Args:
+            params (dict, optional): Model parameters.
+        """
         self.params = params
         self.calibrated = bool(params)
 
     def load_and_preprocess_data(self, file_path, time_column, rainfall_column, interval_minutes=10, fill_method='zero'):
+        """
+        Load and preprocess rainfall data from a CSV file.
+        Args:
+            file_path (str): Path to the CSV file.
+            time_column (str): Name of the datetime column.
+            rainfall_column (str): Name of the rainfall column.
+            interval_minutes (int): Time interval in minutes.
+            fill_method (str): 'zero' to fill missing with 0, 'drop' to drop missing.
+        Returns:
+            pd.DataFrame: Preprocessed rainfall data.
+        """
         df = pd.read_csv(file_path, parse_dates=[time_column])
         df = df.set_index(time_column)[[rainfall_column]]
         df.columns = ['rainfall_mm']
@@ -24,22 +40,35 @@ class BartlettLewisModel:
         return df
 
     def identify_events(self, rainfall_series, inter_event_gap_minutes=30):
+        """
+        Identify rainfall events based on a minimum dry period (inter_event_gap).
+        Args:
+            rainfall_series (pd.Series): Rainfall time series.
+            inter_event_gap_minutes (int): Minimum dry period between events.
+        Returns:
+            list of pd.DataFrame: List of rainfall events.
+        """
         events = []
         interval_minutes = (rainfall_series.index[1] - rainfall_series.index[0]).total_seconds() / 60
         gap_intervals = int(inter_event_gap_minutes / interval_minutes)
         padded_series = pd.concat([
-            pd.Series([0] * gap_intervals, index=pd.date_range(start=rainfall_series.index[0] - pd.Timedelta(minutes=gap_intervals * interval_minutes),
-                                                               periods=gap_intervals, freq=f'{interval_minutes}min')),
+            pd.Series([0] * gap_intervals, index=pd.date_range(
+                start=rainfall_series.index[0] - pd.Timedelta(minutes=gap_intervals * interval_minutes),
+                periods=gap_intervals, freq=f'{interval_minutes}min')),
             rainfall_series,
-            pd.Series([0] * gap_intervals, index=pd.date_range(start=rainfall_series.index[-1] + pd.Timedelta(minutes=interval_minutes),
-                                                               periods=gap_intervals, freq=f'{interval_minutes}min'))
+            pd.Series([0] * gap_intervals, index=pd.date_range(
+                start=rainfall_series.index[-1] + pd.Timedelta(minutes=interval_minutes),
+                periods=gap_intervals, freq=f'{interval_minutes}min'))
         ])
-        in_event, dry_spell_counter, event_start_idx = False, 0, -1
+        in_event = False
+        dry_spell_counter = 0
+        event_start_idx = -1
 
-        for i in range(len(padded_series)):
-            if padded_series.iloc[i] > 0:
+        for i, value in enumerate(padded_series):
+            if value > 0:
                 if not in_event:
-                    in_event, event_start_idx = True, i
+                    in_event = True
+                    event_start_idx = i
                 dry_spell_counter = 0
             else:
                 dry_spell_counter += 1
@@ -48,16 +77,30 @@ class BartlettLewisModel:
                     event = padded_series.iloc[event_start_idx:event_end_idx + 1].loc[lambda x: x > 0]
                     if not event.empty and event.sum() > 0:
                         events.append(event.to_frame(name='rainfall_mm'))
-                    in_event, dry_spell_counter = False, 0
+                    in_event = False
+                    dry_spell_counter = 0
 
         return events
 
     def calibrate(self, events, interval_minutes=10, default_beta=5.0, default_eta=1/10.0):
+        """
+        Calibrate model parameters using the Method of Moments.
+        Args:
+            events (list): List of rainfall events.
+            interval_minutes (int): Time interval in minutes.
+            default_beta (float): Default beta value.
+            default_eta (float): Default eta value.
+        Returns:
+            dict: Calibrated parameters.
+        """
         if not events:
             raise ValueError("No rainfall events found for calibration.")
 
         durations = [len(e) * interval_minutes for e in events]
-        intensities = [e['rainfall_mm'].sum() / (len(e) * interval_minutes) if len(e) > 0 else 0 for e in events]
+        intensities = [
+            e['rainfall_mm'].sum() / (len(e) * interval_minutes) if len(e) > 0 else 0
+            for e in events
+        ]
         total_duration_minutes = (events[-1].index[-1] - events[0].index[0]).total_seconds() / 60 or 1
 
         lambda_param = len(events) / (total_duration_minutes / (24 * 60))
@@ -75,6 +118,15 @@ class BartlettLewisModel:
         return self.params
 
     def generate_synthetic_rainfall(self, total_duration_minutes, output_interval_minutes=10, seed=None):
+        """
+        Generate a synthetic rainfall time series using the Bartlett-Lewis model.
+        Args:
+            total_duration_minutes (int): Total duration in minutes.
+            output_interval_minutes (int): Output interval in minutes.
+            seed (int, optional): Random seed.
+        Returns:
+            pd.Series: Synthetic rainfall series.
+        """
         if not self.calibrated:
             raise ValueError("Model must be calibrated first.")
         if seed is not None:
@@ -105,6 +157,15 @@ class BartlettLewisModel:
         return rainfall
 
     def disaggregate(self, coarse_series, fine_interval_minutes=10, seed=None):
+        """
+        Disaggregate a coarse rainfall series into a finer resolution using the model.
+        Args:
+            coarse_series (pd.Series): Coarse rainfall series.
+            fine_interval_minutes (int): Fine interval in minutes.
+            seed (int, optional): Random seed.
+        Returns:
+            pd.Series: Disaggregated rainfall series.
+        """
         if not self.calibrated:
             raise ValueError("Model must be calibrated first.")
         disagg = pd.Series(dtype=float)
@@ -115,12 +176,20 @@ class BartlettLewisModel:
             coarse_interval_minutes = 60
 
         for ts, value in coarse_series.items():
-            fine_times = pd.date_range(start=ts, periods=int(coarse_interval_minutes / fine_interval_minutes), freq=f'{fine_interval_minutes}min')
+            fine_times = pd.date_range(
+                start=ts,
+                periods=int(coarse_interval_minutes / fine_interval_minutes),
+                freq=f'{fine_interval_minutes}min'
+            )
 
             if value == 0:
                 new_segment = pd.Series(0.0, index=fine_times)
             else:
-                sim = self.generate_synthetic_rainfall(int(coarse_interval_minutes), output_interval_minutes=fine_interval_minutes, seed=seed)
+                sim = self.generate_synthetic_rainfall(
+                    int(coarse_interval_minutes),
+                    output_interval_minutes=fine_interval_minutes,
+                    seed=seed
+                )
                 if sim.sum() > 0:
                     sim *= (value / sim.sum())
                 else:
@@ -136,51 +205,67 @@ class BartlettLewisModel:
         return disagg
 
     def export_params(self, path='params.yaml'):
+        """
+        Export calibrated parameters to a YAML file.
+        Args:
+            path (str): Output file path.
+        """
         if not self.params:
-            raise ValueError("Nenhum parâmetro calibrado para exportar.")
-        # Converte para float puro do Python
+            raise ValueError("No calibrated parameters to export.")
         safe_params = {k: float(v) for k, v in self.params.items()}
         with open(path, 'w') as f:
             yaml.dump(safe_params, f)
 
     def load_params(self, path='params.yaml'):
+        """
+        Load model parameters from a YAML file.
+        Args:
+            path (str): Path to the YAML file.
+        """
         with open(path, 'r') as f:
             self.params = yaml.safe_load(f)
             self.calibrated = True
 
-    def plot_comparison(self, original, desagregada, title='Comparação'):
+    def plot_comparison(self, original, disaggregated, title='Comparison'):
+        """
+        Plot a line comparison between the original and disaggregated rainfall series.
+        Args:
+            original (pd.Series): Original high-resolution series.
+            disaggregated (pd.Series): Disaggregated series.
+            title (str): Plot title.
+        """
         plt.figure(figsize=(12, 5))
         plt.plot(original.index, original.values, label='Original', alpha=0.7)
-        plt.plot(desagregada.index, desagregada.values, label='Desagregada', alpha=0.7, linestyle='--')
+        plt.plot(disaggregated.index, disaggregated.values, label='Disaggregated', alpha=0.7, linestyle='--')
         plt.title(title)
-        plt.ylabel("Chuva (mm)")
-        plt.xlabel("Tempo")
+        plt.ylabel("Rainfall (mm)")
+        plt.xlabel("Time")
         plt.legend()
         plt.grid(True)
         plt.tight_layout()
-        plt.savefig('comparacao_chuva.png')
+        plt.savefig('rainfall_comparison.png')
         plt.show()
 
-    def plot_comparison_barras(self, original, desagregada, title='Comparação - Barras'):
+    def plot_comparison_barras(self, original, disaggregated, title='Comparison - Bars'):
         """
-        Plota a comparação entre a série original e a desagregada usando gráfico de barras.
+        Plot a bar comparison between the original and disaggregated rainfall series.
 
         Args:
-            original (pd.Series): Série original de alta resolução.
-            desagregada (pd.Series): Série desagregada gerada pelo modelo.
-            title (str): Título do gráfico.
+            original (pd.Series): Original high-resolution series.
+            disaggregated (pd.Series): Disaggregated series generated by the model.
+            title (str): Plot title.
         """
         plt.figure(figsize=(14, 6))
         bar_width = (original.index[1] - original.index[0]).total_seconds() / 60
 
         plt.bar(original.index, original.values, width=bar_width / 1440, label='Original', alpha=0.6, align='center')
-        plt.bar(desagregada.index, desagregada.values, width=bar_width / 1440, label='Desagregada', alpha=0.6, align='center')
+        plt.bar(disaggregated.index, disaggregated.values, width=bar_width / 1440, label='Disaggregated', alpha=0.6, align='center')
 
         plt.title(title)
-        plt.xlabel("Tempo")
-        plt.ylabel("Chuva (mm)")
+        plt.xlabel("Time")
+        plt.ylabel("Rainfall (mm)")
         plt.legend()
         plt.grid(True)
         plt.tight_layout()
-        plt.savefig('comparacao_chuva_barras.png')
+        plt.savefig('rainfall_comparison_bars.png')
         plt.show()
