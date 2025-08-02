@@ -1,3 +1,19 @@
+"""Demonstration script for the Bartlett-Lewis rainfall model.
+
+This script can be executed directly from the repository root without first
+installing the ``lildrip`` package.  To achieve this we append the ``src``
+directory to ``sys.path`` so the package can be imported when running
+
+``python examples/bartlett_lewis_demo.py``.
+"""
+
+from pathlib import Path
+import sys
+
+# Allow importing ``lildrip`` when the package has not been installed.  This
+# keeps the example easy to run for new contributors.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
 import pandas as pd
 from lildrip import BartlettLewisModel, plot_comparison_bars
 
