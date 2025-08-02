@@ -1,4 +1,4 @@
-pandas
-scipy
-matplotlib
-pyyaml
+pandas==2.3.1
+scipy==1.16.1
+matplotlib==3.10.5
+pyyaml==6.0.2
