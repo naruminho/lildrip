@@ -81,14 +81,89 @@ class BartlettLewisModel:
 
         return events
 
-    def calibrate(self, events, interval_minutes=10, default_beta=5.0, default_eta=1/10.0):
+    def extract_beta_eta(self, events, interval_minutes=10, intra_event_gap_minutes=15):
+        """Estimate ``beta`` and ``eta`` parameters from rainfall events.
+
+        This routine analyses dry gaps inside each event to identify pulses and
+        compute two statistics:
+
+        * ``beta`` – the average number of pulses per event.
+        * ``eta`` – the inverse of the average pulse duration (in minutes).
+
+        Args:
+            events (list of pd.DataFrame): Rainfall events including zero values
+                between pulses.
+            interval_minutes (int): Temporal resolution of the rainfall series.
+            intra_event_gap_minutes (int): Minimum dry period that separates
+                pulses within an event.
+
+        Returns:
+            tuple: ``(beta, eta)``.
+        """
+        all_pulses_count = []
+        all_pulse_durations = []
+
+        gap_intervals = int(intra_event_gap_minutes / interval_minutes)
+
+        for event in events:
+            values = event['rainfall_mm'].values
+
+            pulse_count = 0
+            pulse_lengths = []
+
+            i = 0
+            while i < len(values):
+                if values[i] > 0:
+                    pulse_length = 1
+                    zero_counter = 0
+                    i += 1
+                    while i < len(values):
+                        if values[i] > 0:
+                            pulse_length += 1
+                            zero_counter = 0
+                        else:
+                            zero_counter += 1
+                            if zero_counter >= gap_intervals:
+                                break
+                            else:
+                                pulse_length += 1
+                        i += 1
+                    pulse_count += 1
+                    pulse_lengths.append(pulse_length * interval_minutes)
+                else:
+                    i += 1
+
+            if pulse_count > 0:
+                all_pulses_count.append(pulse_count)
+                all_pulse_durations.extend(pulse_lengths)
+
+        beta = np.mean(all_pulses_count) if all_pulses_count else 1.0
+        mean_pulse_duration = (
+            np.mean(all_pulse_durations) if all_pulse_durations else 10.0
+        )
+        eta = 1.0 / mean_pulse_duration if mean_pulse_duration > 0 else 0.1
+
+        return beta, eta
+
+    def calibrate(
+        self,
+        events,
+        interval_minutes=10,
+        default_beta=None,
+        default_eta=None,
+        intra_event_gap_minutes=15,
+    ):
         """
         Calibrate model parameters using the Method of Moments.
         Args:
             events (list): List of rainfall events.
             interval_minutes (int): Time interval in minutes.
-            default_beta (float): Default beta value.
-            default_eta (float): Default eta value.
+            default_beta (float, optional): If provided, use this beta value
+                instead of estimating it from ``events``.
+            default_eta (float, optional): If provided, use this eta value
+                instead of estimating it from ``events``.
+            intra_event_gap_minutes (int): Minimum dry period used when
+                estimating beta and eta from events.
         Returns:
             dict: Calibrated parameters.
         """
@@ -106,12 +181,22 @@ class BartlettLewisModel:
         gamma_param = 1.0 / np.mean(durations) if np.mean(durations) > 0 else 0.01
         mu_param = np.mean(intensities) if np.mean(intensities) > 0 else 0.1
 
+        if default_beta is None or default_eta is None:
+            beta_est, eta_est = self.extract_beta_eta(
+                events, interval_minutes, intra_event_gap_minutes
+            )
+            beta_param = default_beta if default_beta is not None else beta_est
+            eta_param = default_eta if default_eta is not None else eta_est
+        else:
+            beta_param = default_beta
+            eta_param = default_eta
+
         self.params = {
             'lambda': lambda_param,
-            'beta': default_beta,
+            'beta': beta_param,
             'gamma': gamma_param,
-            'eta': default_eta,
-            'mu': mu_param
+            'eta': eta_param,
+            'mu': mu_param,
         }
         self.calibrated = True
         return self.params
@@ -224,64 +309,3 @@ class BartlettLewisModel:
         with open(path, 'r') as f:
             self.params = yaml.safe_load(f)
             self.calibrated = True
-
-import pandas as pd
-import numpy as np
-
-def extrair_beta_eta(events, interval_minutes=10, intra_event_gap_minutes=15):
-    """
-    Automatically extracts beta (avg. pulses per event) and eta (1 / avg. pulse duration)
-    by analyzing intra-event dry gaps to identify pulses.
-
-    Args:
-        events (list of pd.DataFrame): List of rainfall events.
-        interval_minutes (int): Temporal resolution of the rainfall series.
-        intra_event_gap_minutes (int): Minimum dry period to separate pulses within an event.
-
-    Returns:
-        tuple: (beta, eta)
-            beta: Average number of pulses per event.
-            eta: 1 / average duration of pulses (in minutes).
-    """
-    all_pulses_count = []
-    all_pulse_durations = []
-
-    gap_intervals = int(intra_event_gap_minutes / interval_minutes)
-
-    for event in events:
-        values = event['rainfall_mm'].values
-
-        pulse_count = 0
-        pulse_lengths = []
-
-        i = 0
-        while i < len(values):
-            if values[i] > 0:
-                pulse_length = 1
-                zero_counter = 0
-                i += 1
-                while i < len(values):
-                    if values[i] > 0:
-                        pulse_length += 1
-                        zero_counter = 0
-                    else:
-                        zero_counter += 1
-                        if zero_counter >= gap_intervals:
-                            break
-                        else:
-                            pulse_length += 1
-                    i += 1
-                pulse_count += 1
-                pulse_lengths.append(pulse_length * interval_minutes)
-            else:
-                i += 1
-
-        if pulse_count > 0:
-            all_pulses_count.append(pulse_count)
-            all_pulse_durations.extend(pulse_lengths)
-
-    beta = np.mean(all_pulses_count) if all_pulses_count else 1.0
-    mean_pulse_duration = np.mean(all_pulse_durations) if all_pulse_durations else 10.0
-    eta = 1.0 / mean_pulse_duration if mean_pulse_duration > 0 else 0.1
-
-    return beta, eta
