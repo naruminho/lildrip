@@ -74,3 +74,18 @@ python examples/bartlett_lewis_demo.py
 O script salva os resultados em arquivos CSV (chuva sintética, parâmetros
 calibrados e chuva desagregada) e exibe um gráfico comparando os valores
 originais e desagregados.
+
+## Deploy no Google Cloud Functions
+
+O arquivo `main.py` expõe dois endpoints FastAPI (`/calibrar` e `/desagregar`)
+e pode ser publicado como uma Cloud Function (2ª geração). Após configurar o
+`gcloud`, execute:
+
+```bash
+gcloud functions deploy lildrip-api \
+  --gen2 --runtime=python312 --region=us-central1 \
+  --entry-point=app --trigger-http --allow-unauthenticated
+```
+
+O parâmetro `--entry-point=app` aponta para o objeto FastAPI definido em
+`main.py`.
