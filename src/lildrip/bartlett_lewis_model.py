@@ -224,3 +224,64 @@ class BartlettLewisModel:
         with open(path, 'r') as f:
             self.params = yaml.safe_load(f)
             self.calibrated = True
+
+import pandas as pd
+import numpy as np
+
+def extrair_beta_eta(events, interval_minutes=10, intra_event_gap_minutes=15):
+    """
+    Automatically extracts beta (avg. pulses per event) and eta (1 / avg. pulse duration)
+    by analyzing intra-event dry gaps to identify pulses.
+
+    Args:
+        events (list of pd.DataFrame): List of rainfall events.
+        interval_minutes (int): Temporal resolution of the rainfall series.
+        intra_event_gap_minutes (int): Minimum dry period to separate pulses within an event.
+
+    Returns:
+        tuple: (beta, eta)
+            beta: Average number of pulses per event.
+            eta: 1 / average duration of pulses (in minutes).
+    """
+    all_pulses_count = []
+    all_pulse_durations = []
+
+    gap_intervals = int(intra_event_gap_minutes / interval_minutes)
+
+    for event in events:
+        values = event['rainfall_mm'].values
+
+        pulse_count = 0
+        pulse_lengths = []
+
+        i = 0
+        while i < len(values):
+            if values[i] > 0:
+                pulse_length = 1
+                zero_counter = 0
+                i += 1
+                while i < len(values):
+                    if values[i] > 0:
+                        pulse_length += 1
+                        zero_counter = 0
+                    else:
+                        zero_counter += 1
+                        if zero_counter >= gap_intervals:
+                            break
+                        else:
+                            pulse_length += 1
+                    i += 1
+                pulse_count += 1
+                pulse_lengths.append(pulse_length * interval_minutes)
+            else:
+                i += 1
+
+        if pulse_count > 0:
+            all_pulses_count.append(pulse_count)
+            all_pulse_durations.extend(pulse_lengths)
+
+    beta = np.mean(all_pulses_count) if all_pulses_count else 1.0
+    mean_pulse_duration = np.mean(all_pulse_durations) if all_pulse_durations else 10.0
+    eta = 1.0 / mean_pulse_duration if mean_pulse_duration > 0 else 0.1
+
+    return beta, eta

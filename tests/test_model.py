@@ -1,5 +1,13 @@
 import pandas as pd
 
+from pathlib import Path
+import sys
+
+# Allow importing ``lildrip`` when the package has not been installed.  This
+# keeps the example easy to run for new contributors.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+
 from lildrip import BartlettLewisModel
 
 
