@@ -57,3 +57,7 @@ def test_calibrate_uses_beta_eta_extraction():
     )
     assert params['beta'] == beta
     assert params['eta'] == eta
+
+    assert 'lambda' in params
+    assert 'mu' in params
+    assert 'gamma' in params
