@@ -31,3 +31,29 @@ def test_disaggregate_preserves_total():
     fine = model.disaggregate(coarse, fine_interval_minutes=30, seed=0)
     assert len(fine) == 4
     assert abs(fine.sum() - coarse.sum()) < 1e-6
+
+
+def test_calibrate_uses_beta_eta_extraction():
+    model = BartlettLewisModel()
+    event1 = pd.DataFrame(
+        {'rainfall_mm': [1, 0, 1]},
+        index=pd.date_range('2023-01-01', periods=3, freq='10min'),
+    )
+    event2 = pd.DataFrame(
+        {'rainfall_mm': [2, 0, 0, 3]},
+        index=pd.date_range('2023-01-02', periods=4, freq='10min'),
+    )
+    beta, eta = model.extract_beta_eta(
+        [event1, event2], interval_minutes=10, intra_event_gap_minutes=10
+    )
+    assert beta == 2
+    assert eta == 0.1
+    params = model.calibrate(
+        [event1, event2],
+        interval_minutes=10,
+        default_beta=None,
+        default_eta=None,
+        intra_event_gap_minutes=10,
+    )
+    assert params['beta'] == beta
+    assert params['eta'] == eta
