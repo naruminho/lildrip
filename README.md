@@ -77,9 +77,10 @@ originais e desagregados.
 
 ## Deploy no Google Cloud Functions
 
-O arquivo `main.py` expõe dois endpoints FastAPI (`/calibrar` e `/desagregar`)
-e pode ser publicado como uma Cloud Function (2ª geração). Após configurar o
-`gcloud`, execute:
+O arquivo `app.py` define dois endpoints FastAPI (`/calibrar` e `/desagregar`).
+O arquivo `main.py` importa esse aplicativo, expondo o objeto `app` e executando
+o servidor Uvicorn quando executado localmente. Após configurar o `gcloud`,
+execute:
 
 ```bash
 gcloud functions deploy lildrip-api \
@@ -87,5 +88,5 @@ gcloud functions deploy lildrip-api \
   --entry-point=app --trigger-http --allow-unauthenticated
 ```
 
-O parâmetro `--entry-point=app` aponta para o objeto FastAPI definido em
+O parâmetro `--entry-point=app` aponta para o objeto FastAPI disponível em
 `main.py`.
