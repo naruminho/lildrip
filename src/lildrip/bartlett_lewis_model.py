@@ -204,37 +204,51 @@ class BartlettLewisModel:
     def generate_synthetic_rainfall(self, total_duration_minutes, output_interval_minutes=10, seed=None):
         """
         Generate a synthetic rainfall time series using the Bartlett-Lewis model.
-        Args:
-            total_duration_minutes (int): Total duration in minutes.
-            output_interval_minutes (int): Output interval in minutes.
-            seed (int, optional): Random seed.
-        Returns:
-            pd.Series: Synthetic rainfall series.
+
+        Parameters
+        ----------
+        total_duration_minutes : int
+            Total duration in minutes.
+        output_interval_minutes : int, optional
+            Output interval in minutes (default: 10).
+        seed : int or np.random.Generator, optional
+            Random seed or Generator instance for reproducibility.
+
+        Returns
+        -------
+        pd.Series
+            Synthetic rainfall series.
         """
         if not self.calibrated:
             raise ValueError("Model must be calibrated first.")
-        if seed is not None:
-            np.random.seed(seed)
+
+        # Thread-safe RNG — accepts both int seed and Generator instance
+        rng = np.random.default_rng(seed)
 
         p = self.params
-        n_intervals = total_duration_minutes // output_interval_minutes
-        rainfall = pd.Series(0.0, index=pd.date_range("2000-01-01", periods=n_intervals, freq=f'{output_interval_minutes}min'))
+        n_intervals = int(total_duration_minutes // output_interval_minutes)
+        rainfall = pd.Series(
+            0.0,
+            index=pd.date_range(
+                "2000-01-01", periods=n_intervals, freq=f'{output_interval_minutes}min'
+            ),
+        )
 
         lambda_per_min = p['lambda'] / (24 * 60)
-        n_storms = poisson.rvs(lambda_per_min * total_duration_minutes)
+        n_storms = poisson.rvs(lambda_per_min * total_duration_minutes, random_state=rng)
 
         for _ in range(n_storms):
-            storm_start = np.random.uniform(0, total_duration_minutes)
-            pulses = poisson.rvs(p['beta'])
+            storm_start = rng.uniform(0, total_duration_minutes)
+            pulses = poisson.rvs(p['beta'], random_state=rng)
             current_time = storm_start
             for _ in range(pulses):
-                current_time += expon.rvs(scale=1 / p['gamma'])
-                duration = expon.rvs(scale=1 / p['eta'])
-                intensity = expon.rvs(scale=p['mu'])
+                current_time += rng.exponential(scale=1 / p['gamma'])
+                duration = rng.exponential(scale=1 / p['eta'])
+                intensity = rng.exponential(scale=p['mu'])
 
-                i_start = int(current_time // output_interval_minutes)
-                i_end = int((current_time + duration) // output_interval_minutes)
-                for i in range(i_start, i_end):
+                start_idx = int(current_time // output_interval_minutes)
+                end_idx = int((current_time + duration) // output_interval_minutes)
+                for i in range(start_idx, end_idx):
                     if 0 <= i < len(rainfall):
                         rainfall.iloc[i] += intensity
 
@@ -243,12 +257,20 @@ class BartlettLewisModel:
     def disaggregate(self, coarse_series, fine_interval_minutes=10, seed=None):
         """
         Disaggregate a coarse rainfall series into a finer resolution using the model.
-        Args:
-            coarse_series (pd.Series): Coarse rainfall series.
-            fine_interval_minutes (int): Fine interval in minutes.
-            seed (int, optional): Random seed.
-        Returns:
-            pd.Series: Disaggregated rainfall series.
+
+        Parameters
+        ----------
+        coarse_series : pd.Series
+            Coarse rainfall series.
+        fine_interval_minutes : int, optional
+            Fine interval in minutes (default: 10).
+        seed : int or np.random.Generator, optional
+            Random seed or Generator instance for reproducibility.
+
+        Returns
+        -------
+        pd.Series
+            Disaggregated rainfall series.
         """
         if not self.calibrated:
             raise ValueError("Model must be calibrated first.")

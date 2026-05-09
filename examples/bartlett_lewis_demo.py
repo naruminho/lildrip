@@ -10,81 +10,63 @@ directory to ``sys.path`` so the package can be imported when running
 from pathlib import Path
 import sys
 
-# Allow importing ``lildrip`` when the package has not been installed.  This
-# keeps the example easy to run for new contributors.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 import pandas as pd
-from lildrip import BartlettLewisModel, plot_comparison_bars
+from lildrip import BartlettLewisModel, plot_comparison, plot_comparison_bars
 
 
-def load_dataframe(filepath, index_col='timestamp'):
+def load_dataframe(filepath: str, index_col: str = "timestamp") -> pd.DataFrame:
     """Load a CSV file as a DataFrame with datetime index."""
-    try:
-        df = pd.read_csv(filepath, parse_dates=[index_col])
-        df = df.set_index(index_col)
-        return df
-    except Exception as e:
-        print(f"Error loading {filepath}: {e}")
-        raise
+    df = pd.read_csv(filepath, parse_dates=[index_col])
+    return df.set_index(index_col)
 
 
-def main():
-    # Load fine resolution rainfall series
-    df_fine = load_dataframe('chuva_fina_exemplo.csv')
+def main() -> None:
+    # ── 1. Load fine-resolution rainfall ──────────────────────────────
+    df_fine = load_dataframe("fine_rainfall_demo.csv")
 
-    # Instantiate model
     bl_model = BartlettLewisModel()
 
-    # Preprocess data
+    # Preprocess
     df_fine_proc = bl_model.load_and_preprocess_data(
-        file_path='chuva_fina_exemplo.csv',
-        time_column='timestamp',
-        rainfall_column='chuva_mm',
-        interval_minutes=10
+        file_path="fine_rainfall_demo.csv",
+        time_column="timestamp",
+        rainfall_column="rainfall_mm",
+        interval_minutes=10,
     )
 
-    # Identify events
-    events = bl_model.identify_events(df_fine_proc['rainfall_mm'], inter_event_gap_minutes=30)
-
-    # Calibrate model
+    # ── 2. Identify events and calibrate ──────────────────────────
+    events = bl_model.identify_events(
+        df_fine_proc["rainfall_mm"], inter_event_gap_minutes=30
+    )
     params = bl_model.calibrate(events)
     print("Calibrated parameters:", params)
+    bl_model.export_params("calibrated_params.yaml")
 
-    # Export parameters
-    bl_model.export_params('params_calibrados.yaml')
-
-    # Simulate synthetic series (e.g.: 1 day)
+    # ── 3. Generate synthetic rainfall (1 day) ────────────────────
     synthetic_rain = bl_model.generate_synthetic_rainfall(
-        total_duration_minutes=1440,
-        output_interval_minutes=10,
-        seed=42
+        total_duration_minutes=1440, output_interval_minutes=10, seed=42
     )
-    synthetic_rain.to_csv('chuva_sintetica.csv')
-    print("Synthetic rainfall generated and saved.")
+    synthetic_rain.to_csv("synthetic_rainfall.csv")
+    print("Synthetic rainfall saved to synthetic_rainfall.csv")
 
-    # Load coarse resolution rainfall series
-    df_coarse = load_dataframe('chuva_grossa_exemplo.csv')
-    coarse_series = df_coarse['chuva_mm_grossa']
+    # ── 4. Disaggregate a coarse series ──────────────────────────
+    df_coarse = load_dataframe("coarse_rainfall_demo.csv")
+    coarse_series = df_coarse["rainfall_mm"]
 
-    # Disaggregate series
     disaggregated_rain = bl_model.disaggregate(
-        coarse_series,
-        fine_interval_minutes=10,
-        seed=42
+        coarse_series, fine_interval_minutes=10, seed=42
     )
-    disaggregated_rain.to_csv('chuva_desagregada.csv')
-    print("Disaggregated rainfall saved.")
+    disaggregated_rain.to_csv("disaggregated_rainfall.csv")
+    print("Disaggregated rainfall saved to disaggregated_rainfall.csv")
 
-    # Compare with original series (if available)
-    start, end = disaggregated_rain.index.min(), disaggregated_rain.index.max()
-    original_subset = df_fine_proc['rainfall_mm'].loc[start:end]
+    # ── 5. Visual comparison ──────────────────────────────────────
+    start = disaggregated_rain.index.min()
+    end = disaggregated_rain.index.max()
+    original_subset = df_fine_proc["rainfall_mm"].loc[start:end]
 
-    plot_comparison_bars(
-        original_subset,
-        disaggregated_rain,
-        title="Original vs Disaggregated"
-    )
+    plot_comparison_bars(original_subset, disaggregated_rain, title="Original vs Disaggregated")
 
 
 if __name__ == "__main__":

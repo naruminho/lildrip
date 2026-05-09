@@ -1,92 +1,125 @@
-# Bartlett-Lewis Model for Stochastic Rainfall Disaggregation
---------------------------------------------------------------
+# lildrip — Bartlett-Lewis Rainfall Disaggregation
 
-This model implements the stochastic logic of the Bartlett-Lewis process to simulate the temporal structure of precipitation and perform the disaggregation of coarse temporal resolution rainfall series (such as daily or hourly) into finer series (such as 10 minutes).
+[![PyPI version](https://img.shields.io/pypi/v/lildrip)](https://pypi.org/project/lildrip/)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://python.org)
 
-Model Parameters (calibrated based on a high-resolution rainfall series):
-- lambda (λ): average frequency of storm occurrences (rain events) per day.
-- beta (β): average number of pulses (small rain events) per storm.
-- gamma (γ): termination rate of the storm (inverse of the average duration of the rain event).
-- eta (η): termination rate of a pulse (inverse of the average duration of the rain pulse).
-- mu (μ): average rainfall intensity per pulse (mm).
+Stochastic simulation and temporal disaggregation of rainfall using the
+**Bartlett-Lewis process**.  It takes coarse-resolution rainfall series (e.g.,
+hourly) and generates finer-resolution series (e.g., 10-minute intervals) based
+on calibrated storm statistics.
 
-Usage Flow:
--------------
-1. **Model Calibration**
-    - Load the fine resolution rainfall series with a fixed interval (e.g., 10 minutes).
-    - Identify rain events based on a minimum dry period between them (inter_event_gap).
-    - Calibrate the model parameters based on the statistics of these events.
-
-2. **Disaggregation**
-    - Load the coarse resolution rainfall series (e.g., hourly).
-    - For each observed value in the coarse series:
-        - Simulate a rain event based on the calibrated parameters.
-        - Adjust the simulated rainfall intensity to match the observed volume.
-        - Divide the simulated rainfall into the desired finer intervals.
-
-3. **Export and Validation**
-    - Export the calibrated parameters in YAML format for reuse.
-    - Compare the disaggregated series with real data visually and statistically (when available).
-
-Observations:
-------------
-- The parameter calibration uses the Method of Moments (MoM), which is simpler than MLE but more straightforward.
-- The disaggregation is stochastic: each execution may generate a different distribution for the same input value.
-- It is recommended to use a random seed to ensure reproducibility of the results.
-- The model is suitable for hydrological applications where the temporal distribution of rainfall affects runoff, infiltration, among other processes.
-
-Example of Calibrated Parameters:
----------------------------------
-lambda: 17.5        # ~17 rain events per day
-beta: 5.0           # ~5 pulses per event
-gamma: 0.05         # ~20 minutes duration per event
-eta: 0.1            # ~10 minutes per pulse
-mu: 0.12            # ~0.12 mm per rain pulse
-
-## Gerando dados de chuva de exemplo
-
-Antes de rodar os exemplos, instale as dependências do projeto:
+## Quick install
 
 ```bash
-pip install -r requirements.txt
+pip install lildrip
 ```
 
-Para criar séries de chuva fina e grossa sintéticas, execute o script:
+For the FastAPI web API:
 
 ```bash
+pip install "lildrip[api]"
+```
+
+## Usage — Python library
+
+```python
+from lildrip import BartlettLewisModel
+
+# 1. Calibrate from a fine-resolution CSV
+model = BartlettLewisModel()
+events = model.identify_events(fine_series, inter_event_gap_minutes=30)
+params = model.calibrate(events)
+print("Calibrated parameters:", params)
+
+# 2. Disaggregate a coarse series
+disagg = model.disaggregate(coarse_series, fine_interval_minutes=10)
+```
+
+## Usage — Web API
+
+Start the server:
+
+```bash
+pip install "lildrip[api]"
+uvicorn app:app --host 0.0.0.0 --port 8000
+```
+
+### `POST /calibrar`
+
+Upload a high-resolution CSV to calibrate model parameters.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `arquivo` | file | — | CSV with time and rainfall columns |
+| `time_column` | string | `timestamp` | Name of the datetime column |
+| `rainfall_column` | string | `rainfall_mm` | Name of the rainfall column |
+| `interval_minutes` | int | `10` | Temporal resolution of the series |
+| `inter_event_gap_minutes` | int | `30` | Minimum dry period between events |
+| `intra_event_gap_minutes` | int | `15` | Minimum dry period between pulses |
+
+### `POST /desagregar`
+
+Upload a coarse CSV + calibration parameters to obtain a disaggregated series.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `arquivo` | file | — | CSV with coarse rainfall |
+| `params` | string | — | JSON string of calibration parameters |
+| `time_column` | string | `timestamp` | Name of the datetime column |
+| `rainfall_column` | string | `rainfall_mm` | Name of the rainfall column |
+| `disagg_interval_minutes` | int | `10` | Target fine resolution |
+
+## Running the demo
+
+```bash
+# Generate demo CSV files
 python examples/generate_demo_rain.py
-```
 
-Ele gera dois arquivos:
-
-- `chuva_fina_exemplo.csv` – chuva simulada a cada 10 minutos.
-- `chuva_grossa_exemplo.csv` – mesma chuva agregada para intervalos de 1 hora.
-
-## Executando o demo
-
-Com os arquivos acima disponíveis, execute o demo que calibra o modelo, gera
-chuva sintética e desagrega a série grossa:
-
-```bash
+# Run the calibration + disaggregation pipeline
 python examples/bartlett_lewis_demo.py
 ```
 
-O script salva os resultados em arquivos CSV (chuva sintética, parâmetros
-calibrados e chuva desagregada) e exibe um gráfico comparando os valores
-originais e desagregados.
+## Model parameters
 
-## Deploy no Google Cloud Functions
+The Bartlett-Lewis model describes rainfall through five parameters:
 
-O arquivo `app.py` define dois endpoints FastAPI (`/calibrar` e `/desagregar`).
-O arquivo `main.py` importa esse aplicativo, expondo o objeto `app` e executando
-o servidor Uvicorn quando executado localmente. Após configurar o `gcloud`,
-execute:
+| Symbol | Name | Meaning |
+|--------|------|---------|
+| λ (lambda) | Storm frequency | Average number of storms per day |
+| β (beta) | Pulses per storm | Average number of rain pulses in each storm |
+| γ (gamma) | Storm termination rate | Inverse of the average storm duration (min⁻¹) |
+| η (eta) | Pulse termination rate | Inverse of the average pulse duration (min⁻¹) |
+| μ (mu) | Pulse intensity | Average rainfall intensity per pulse (mm) |
+
+Calibration uses the **Method of Moments (MoM)**.
+
+## Running with Docker
 
 ```bash
-gcloud functions deploy lildrip-api \
-  --gen2 --runtime=python312 --region=us-central1 \
-  --entry-point=app --trigger-http --allow-unauthenticated
+docker build -t lildrip .
+docker run -p 8000:8000 lildrip
 ```
 
-O parâmetro `--entry-point=app` aponta para o objeto FastAPI disponível em
-`main.py`.
+## Project structure
+
+```
+lildrip/
+├── src/lildrip/
+│   ├── __init__.py
+│   ├── bartlett_lewis_model.py   # Core model
+│   └── plotting.py               # Visualisation helpers
+├── examples/
+│   ├── generate_demo_rain.py
+│   └── bartlett_lewis_demo.py
+├── tests/
+│   └── test_model.py
+├── app.py                        # FastAPI application
+├── main.py                       # Uvicorn entry point
+├── Dockerfile
+├── pyproject.toml
+└── README.md
+```
+
+## License
+
+MIT
