@@ -71,13 +71,29 @@ Upload a coarse CSV + calibration parameters to obtain a disaggregated series.
 
 ## Running the demo
 
-```bash
-# Generate demo CSV files
-python examples/generate_demo_rain.py
+### No rainfall data? Generate synthetic data first
 
-# Run the calibration + disaggregation pipeline
+```bash
+python examples/generate_demo_rain.py
+```
+
+Creates two sample CSV files:
+- `fine_rainfall_demo.csv` — 10-minute resolution (simulated)
+- `coarse_rainfall_demo.csv` — hourly aggregate of the same data
+
+### Run the full pipeline (calibrate + disaggregate + plot)
+
+```bash
 python examples/bartlett_lewis_demo.py
 ```
+
+This will:
+1. Load the generated fine and coarse data
+2. Identify rainfall events and calibrate the model
+3. Generate a synthetic series from the calibrated model
+4. Disaggregate the coarse series into 10-minute resolution
+5. Save all outputs as CSV files
+6. Show a comparison plot (saved as `rainfall_comparison_bars.png`)
 
 ## Model parameters
 

@@ -13,7 +13,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 import pandas as pd
-from lildrip import BartlettLewisModel, plot_comparison, plot_comparison_bars
+from lildrip import BartlettLewisModel, plot_comparison_bars
 
 
 def load_dataframe(filepath: str, index_col: str = "timestamp") -> pd.DataFrame:
