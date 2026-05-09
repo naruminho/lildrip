@@ -3,14 +3,14 @@
 *Stochastic rainfall disaggregation with the Bartlett-Lewis process*
 
 [![PyPI](https://img.shields.io/pypi/v/lildrip?color=blue)](https://pypi.org/project/lildrip/)
+[![Frontend](https://img.shields.io/badge/frontend-%F0%9F%8C%90%20live-pink)](https://naruminho.github.io/lildrip-frontend/)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://python.org)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 ---
 
-**lildrip** takes coarse-resolution rainfall data (e.g. hourly) and generates
-finer-resolution series (e.g. 10-minute intervals) using the **Bartlett-Lewis
-stochastic process** — a well-established model in hydrology.
+> 🌐 **Try it in your browser:** [naruminho.github.io/lildrip-frontend](https://naruminho.github.io/lildrip-frontend/) — upload, calibrate, and
+> disaggregate right in your browser. No Python needed.
 
 ## Quick start
 
